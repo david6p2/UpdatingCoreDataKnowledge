@@ -39,7 +39,6 @@ class MainViewController: UIViewController {
 	private var friendPets = [String:[String]]()
 	private var selected:IndexPath!
 	private var picker = UIImagePickerController()
-	private var images = [String:UIImage]()
     private var appDelegate = UIApplication.shared.delegate as! AppDelegate
     private let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
 
@@ -55,6 +54,7 @@ class MainViewController: UIViewController {
         } catch let error as NSError {
             print(("Could not fet. \(error), \(error.userInfo)"))
         }
+        showEditButton()
     }
 
 	override func didReceiveMemoryWarning() {
@@ -114,9 +114,11 @@ extension MainViewController: UICollectionViewDelegate, UICollectionViewDataSour
         cell.addressLabel.text = friend.address
         cell.ageLabel.text = "Age: \(friend.age)"
         cell.eyeColorView.backgroundColor = friend.eyeColor as? UIColor
-		if let image = images[friend.name!] {
-			cell.pictureImageView.image = image
-		}
+        if let data = friend.photo as Data? {
+            cell.pictureImageView.image = UIImage(data:data)
+        } else {
+            cell.pictureImageView.image = UIImage(named: "person-placeholder")
+        }
 		return cell
 	}
 	
@@ -158,7 +160,8 @@ extension MainViewController: UIImagePickerControllerDelegate, UINavigationContr
 	func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [String : Any]) {
 		let image = info[UIImagePickerControllerOriginalImage] as! UIImage
 		let friend = isFiltered ? filtered[selected.row] : friends[selected.row]
-		images[friend.name!] = image
+		friend.photo = UIImagePNGRepresentation(image) as NSData?
+        appDelegate.saveContext()
 		collectionView?.reloadItems(at: [selected])
 		picker.dismiss(animated: true, completion: nil)
 	}
