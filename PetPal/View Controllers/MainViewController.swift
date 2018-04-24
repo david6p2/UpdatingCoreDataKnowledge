@@ -29,16 +29,17 @@
 */
 
 import UIKit
+import CoreData
 
 class MainViewController: UIViewController {
 	@IBOutlet private weak var collectionView:UICollectionView!
 	
 	private var friends = [Friend]()
-	private var filtered = [Friend]()
-	private var isFiltered = false
 	private var friendPets = [String:[String]]()
 	private var selected:IndexPath!
 	private var picker = UIImagePickerController()
+    private var query = ""
+    
     private var appDelegate = UIApplication.shared.delegate as! AppDelegate
     private let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
 
@@ -49,11 +50,7 @@ class MainViewController: UIViewController {
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        do {
-            friends = try context.fetch(Friend.fetchRequest())
-        } catch let error as NSError {
-            print(("Could not fet. \(error), \(error.userInfo)"))
-        }
+        refresh()
         showEditButton()
     }
 
@@ -87,9 +84,8 @@ class MainViewController: UIViewController {
         friend.dob = data.dob as NSDate
         friend.eyeColor = data.eyeColor
         appDelegate.saveContext()
-		friends.append(friend)
-		let index = IndexPath(row:friends.count - 1, section:0)
-		collectionView?.insertItems(at: [index])
+        refresh()
+        collectionView.reloadData()
 	}
 	
 	// MARK:- Private Methods
@@ -103,13 +99,13 @@ class MainViewController: UIViewController {
 // Collection View Delegates
 extension MainViewController: UICollectionViewDelegate, UICollectionViewDataSource {
 	func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-		let count = isFiltered ? filtered.count : friends.count
+		let count = friends.count
 		return count
 	}
 	
 	func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
 		let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "FriendCell", for: indexPath) as! FriendCell
-		let friend = isFiltered ? filtered[indexPath.row] : friends[indexPath.row]
+		let friend = friends[indexPath.row]
 		cell.nameLabel.text = friend.name!
         cell.addressLabel.text = friend.address
         cell.ageLabel.text = "Age: \(friend.age)"
@@ -130,25 +126,38 @@ extension MainViewController: UICollectionViewDelegate, UICollectionViewDataSour
 			performSegue(withIdentifier: "petSegue", sender: indexPath)
 		}
 	}
+    
+    private func refresh() {
+        let request = Friend.fetchRequest() as NSFetchRequest<Friend>
+//        let sort = NSSortDescriptor(keyPath: \Friend.name, ascending: true)
+        if !query.isEmpty {
+            request.predicate = NSPredicate(format: "name CONTAINS[cd] %@", query)
+        }
+        let sort = NSSortDescriptor(key: #keyPath(Friend.name), ascending: true, selector: #selector(NSString.caseInsensitiveCompare(_:)))
+        request.sortDescriptors = [sort]
+        do {
+            friends = try context.fetch(request)
+        } catch let error as NSError {
+            print("Could not fetch. \(error), \(error.userInfo)")
+        }
+    }
 }
 
 // Search Bar Delegate
 extension MainViewController:UISearchBarDelegate {
 	func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
-		guard let query = searchBar.text else {
+		guard let text = searchBar.text else {
 			return
 		}
-		isFiltered = true
-		filtered = friends.filter({(friend) -> Bool in
-			return friend.name!.contains(query)
-		})
-		searchBar.resignFirstResponder()
+        query = text
+		refresh()
+        searchBar.resignFirstResponder()
 		collectionView.reloadData()
 	}
 	
 	func searchBarCancelButtonClicked(_ searchBar: UISearchBar) {
-		isFiltered = false
-		filtered.removeAll()
+        query = ""
+        refresh()
 		searchBar.text = nil
 		searchBar.resignFirstResponder()
 		collectionView.reloadData()
@@ -159,7 +168,7 @@ extension MainViewController:UISearchBarDelegate {
 extension MainViewController: UIImagePickerControllerDelegate, UINavigationControllerDelegate {
 	func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [String : Any]) {
 		let image = info[UIImagePickerControllerOriginalImage] as! UIImage
-		let friend = isFiltered ? filtered[selected.row] : friends[selected.row]
+		let friend = friends[selected.row]
 		friend.photo = UIImagePNGRepresentation(image) as NSData?
         appDelegate.saveContext()
 		collectionView?.reloadItems(at: [selected])

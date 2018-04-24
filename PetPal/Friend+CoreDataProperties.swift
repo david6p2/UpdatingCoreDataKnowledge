@@ -2,7 +2,7 @@
 //  Friend+CoreDataProperties.swift
 //  PetPal
 //
-//  Created by David Andres Cespedes on 4/21/18.
+//  Created by David Andres Cespedes on 4/23/18.
 //  Copyright © 2018 Razeware. All rights reserved.
 //
 //
